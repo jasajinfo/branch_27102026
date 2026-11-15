@@ -1,0 +1,24 @@
+:root {
+  font-family: "Inter", "Segoe UI", Arial, sans-serif;
+  color: #22253c;
+  background: #f8f9fc;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+
+  --color-text: #252942;
+  --color-ink: #171b35;
+  --color-muted: #737991;
+  --color-brand: #6048dc;
+  --color-brand-dark: #4532c3;
+  --color-brand-pale: #f1eeff;
+  --color-border: #e8e9f2;
+  --color-surface: #fff;
+  --color-bg: #f8f9fc;
+  --color-success: #2f906f;
+  --color-gold: #f2a736;
+  --shadow-card: 0 12px 38px rgba(42, 39, 95, .06);
+  --shadow-float: 0 20px 65px rgba(60, 50, 135, .12);
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --container-max: 1180px;
+}

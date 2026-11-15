@@ -1,0 +1,38 @@
+{
+  "name": "nest-microservices",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepositório NestJS com API Gateway, microsserviço Users e frontend React Curso ADS",
+  "engines": { "node": ">=20.19.0" },
+  "workspaces": ["apps/web"],
+  "scripts": {
+    "start": "nest start api-gateway",
+    "start:dev": "nest start api-gateway --watch",
+    "start:dev:gateway": "nest start api-gateway --watch",
+    "start:dev:users": "nest start users --watch",
+    "start:dev:web": "npm run dev --workspace=@curso-ads/web",
+    "build:gateway": "nest build api-gateway",
+    "build:users": "nest build users",
+    "build:web": "npm run build --workspace=@curso-ads/web",
+    "build": "npm run build:gateway && npm run build:users && npm run build:web",
+    "lint:web": "npm run lint --workspace=@curso-ads/web"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.0.0",
+    "@nestjs/core": "^11.0.0",
+    "@nestjs/microservices": "^11.0.0",
+    "@nestjs/platform-express": "^11.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.15.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
