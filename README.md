@@ -1,4 +1,4 @@
-# Tutorial 03 — NestJS, RabbitMQ, Notifications e Transactional Outbox
+# Tutoriais 03 e 04 — Microserviços NestJS + catálogo DevFlix (Prisma)
 
 **Projeto completo, atualizado sobre o Tutorial 02.** O monorepo anterior foi preservado: API Gateway, Users, Orders, DTOs, bancos PostgreSQL existentes e frontend React/Vite (`curso-ads/`). A novidade é o serviço de notificações, a comunicação por eventos e os mecanismos de tratamento de falhas apresentados no **Tutorial 03**.
 
@@ -193,3 +193,133 @@ de preparação deste ZIP não pôde acessar o registro npm, portanto não foi
 possível atualizar o lockfile nem realizar um teste integrado com as novas
 dependências aqui. As sintaxes dos arquivos `.ts`, `.cjs` e `.mjs` foram
 verificadas localmente.
+
+
+---
+
+## Tutorial 04 — Catálogo de categorias, cursos e aulas (Branch_10112026)
+
+A base enviada é um **monorepo NestJS**, e não o projeto `devflix/backend` mostrado
+no texto da aula. Por isso, a adaptação foi feita dentro do monorepo, sem modificar os
+serviços Users, Orders, Notifications, suas bases anteriores ou o frontend `curso-ads`.
+
+### O que foi acrescentado
+
+| Recurso do tutorial | Local adaptado neste repositório |
+|---|---|
+| `Category`, `Course` e `Lesson` | `prisma/catalog/schema.prisma` |
+| Migration incremental | `prisma/catalog/migrations/20261115011000_add_courses_lessons/` |
+| Seed com `upsert` | `prisma/catalog/seed.ts` |
+| `CoursesService` e `CoursesController` | `apps/api-gateway/src/courses/` |
+| Configuração Prisma 7 | `prisma/catalog.config.ts` |
+| API HTTP | `http://localhost:3000/courses` e `/courses/:id` |
+
+A configuração do Prisma é **CommonJS**, igual aos demais serviços deste repositório;
+o material didático pressupõe um projeto ESM com imports terminados em `.js`. O seed
+usa `ts-node` já instalado em vez de `tsx` para preservar as dependências do projeto.
+
+### Instalação no VS Code (PowerShell)
+
+Abra o terminal **na raiz** da pasta `Branch_10112026`, onde estão `package.json` e
+`docker-compose.yml`. Em instalações novas:
+
+```powershell
+Copy-Item .env.example .env
+npm install
+# Docker Desktop precisa estar aberto:
+docker compose up -d
+# Os dois comandos abaixo não apagam dados existentes:
+npm run db:ensure:notifications
+npm run db:ensure:catalog
+npm run db:deploy
+npm run db:generate
+npm run db:seed:catalog
+```
+
+**Se você já possui `.env` no seu computador**, não o substitua: acrescente apenas
+`CATALOG_DATABASE_URL="postgresql://postgres:postgres@localhost:15433/catalog_db?schema=public"`
+e preserve suas configurações anteriores e a senha/porta reais do PostgreSQL.
+
+**Não use** `prisma migrate reset`. Se o banco já existia, as migrations verificam
+quais mudanças estão pendentes. `db:ensure:catalog` cria apenas o novo banco se faltar.
+
+Para iniciar os microserviços anteriores e o Gateway, abra quatro terminais separados
+na raiz e execute, respectivamente:
+
+```powershell
+npm run start:dev:users
+npm run start:dev:orders
+npm run start:dev:notifications
+npm run start:dev:gateway
+```
+
+Os endpoints do catálogo estão no **Gateway**, na porta 3000. Para conferir em
+outro terminal PowerShell:
+
+```powershell
+Invoke-RestMethod http://localhost:3000/health
+Invoke-RestMethod http://localhost:3000/courses
+Invoke-RestMethod http://localhost:3000/courses/1
+```
+
+O ID `1` é ilustrativo: consulte `/courses` para ver os IDs realmente gravados.
+Testes de erro:
+
+```powershell
+# 404: curso inexistente
+try { Invoke-WebRequest http://localhost:3000/courses/999999 } catch { $_.Exception.Response.StatusCode }
+# 400: identificador inválido
+try { Invoke-WebRequest http://localhost:3000/courses/abc } catch { $_.Exception.Response.StatusCode }
+```
+
+### Testes e validação
+
+```powershell
+npm run db:validate:catalog        # valida o schema Prisma 7
+npm run db:generate:catalog        # gera o client Prisma 7
+npm run test                       # 3 testes unitários sem acesso ao banco
+npm run build                      # compila os serviços originais e o catálogo
+npm run test:smoke:catalog         # precisa do banco populado + Gateway funcionando
+npm run db:seed:catalog            # pode repetir sem duplicar registros
+```
+
+Também é possível inspecionar com PostgreSQL:
+
+```powershell
+docker exec -it postgres-curso-ads psql -U postgres -d catalog_db
+```
+
+No prompt `psql`, use `\dt`, `\d "Course"`, `\d "Lesson"` e saia com `\q`.
+Para conferir os JOINs, a quantidade de aulas e as regras das chaves estrangeiras, execute:
+
+```powershell
+Get-Content scripts/verify-catalog.sql | docker exec -i postgres-curso-ads psql -U postgres -d catalog_db
+```
+
+Uma categoria que possui cursos não poderá ser apagada (Restrict); aulas de um
+curso são apagadas em cascata, conforme o tutorial. O par `(courseId, position)` é único.
+
+### Publicar **apenas** a branch Branch_10112026 no GitHub
+
+Se o repositório original já está clonado, copie os arquivos alterados deste ZIP para
+**a pasta do clone que contém `.git`**. A branch não é criada automaticamente por um ZIP.
+No terminal dessa pasta, após conferir se está no repositório correto:
+
+```powershell
+git remote -v
+git status
+git switch -c Branch_10112026
+git add .
+git commit -m "Tutorial 04: catalogo de cursos e aulas com Prisma"
+git push -u origin Branch_10112026
+git ls-remote --heads origin Branch_10112026
+```
+
+Se a branch já existir localmente, use `git switch Branch_10112026` em vez de
+`git switch -c`. O último comando confirma a presença da branch no servidor.
+Acesse a branch pelo seletor **main** na página do GitHub. Não faça `push` na
+`main` ou em `tutorial03` se a entrega deve permanecer apenas nesta branch.
+
+> **Observação:** este tutorial acrescenta o backend do catálogo. A interface
+> React/Vite `curso-ads/` permanece funcional com os dados estáticos anteriores;
+> conectá-la a `/courses` não foi solicitado nesta etapa do material.

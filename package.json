@@ -1,8 +1,8 @@
 {
   "name": "curso-ads-nest-microservices",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "private": true,
-  "description": "Tutorial 3 NestJS: RabbitMQ, Notifications, DLQ, idempotencia e Transactional Outbox, Prisma 7, PostgreSQL e React/Vite",
+  "description": "Tutoriais 03 e 04: microserviços NestJS e catálogo de cursos e aulas DevFlix com Prisma 7",
   "workspaces": [
     "curso-ads"
   ],
@@ -17,13 +17,13 @@
     "start:gateway": "node dist/apps/api-gateway/src/main.js",
     "start:users": "node dist/apps/users/src/main.js",
     "start:orders": "node dist/apps/orders/src/main.js",
-    "db:generate": "npm run db:generate:users && npm run db:generate:orders && npm run db:generate:notifications",
+    "db:generate": "npm run db:generate:users && npm run db:generate:orders && npm run db:generate:notifications && npm run db:generate:catalog",
     "db:generate:users": "prisma generate --config prisma/users.config.ts",
     "db:generate:orders": "prisma generate --config prisma/orders.config.ts",
-    "db:migrate": "npm run db:migrate:users && npm run db:migrate:orders && npm run db:migrate:notifications",
+    "db:migrate": "npm run db:migrate:users && npm run db:migrate:orders && npm run db:migrate:notifications && npm run db:migrate:catalog",
     "db:migrate:users": "prisma migrate dev --config prisma/users.config.ts",
     "db:migrate:orders": "prisma migrate dev --config prisma/orders.config.ts",
-    "db:deploy": "prisma migrate deploy --config prisma/users.config.ts && prisma migrate deploy --config prisma/orders.config.ts && prisma migrate deploy --config prisma/notifications.config.ts",
+    "db:deploy": "prisma migrate deploy --config prisma/users.config.ts && prisma migrate deploy --config prisma/orders.config.ts && prisma migrate deploy --config prisma/notifications.config.ts && prisma migrate deploy --config prisma/catalog.config.ts",
     "test:smoke": "node scripts/smoke-test.mjs",
     "start:dev:notifications": "node --watch -r ts-node/register -r tsconfig-paths/register apps/notifications/src/main.ts",
     "start:notifications": "node dist/apps/notifications/src/main.js",
@@ -31,7 +31,16 @@
     "db:migrate:notifications": "prisma migrate dev --config prisma/notifications.config.ts",
     "rabbitmq:setup": "node --env-file=.env scripts/setup-rabbitmq.cjs",
     "test:smoke:events": "node scripts/test-events.mjs",
-    "db:ensure:notifications": "node scripts/ensure-notifications-db.cjs"
+    "db:ensure:notifications": "node scripts/ensure-notifications-db.cjs",
+    "db:generate:catalog": "prisma generate --config prisma/catalog.config.ts",
+    "db:migrate:catalog": "prisma migrate dev --config prisma/catalog.config.ts",
+    "db:ensure:catalog": "node scripts/ensure-catalog-db.cjs",
+    "db:seed:catalog": "prisma db seed --config prisma/catalog.config.ts",
+    "db:seed": "npm run db:seed:catalog",
+    "test:catalog": "npm run db:generate:catalog && node --test -r ts-node/register apps/api-gateway/src/courses/courses.service.spec.ts",
+    "test:smoke:catalog": "node scripts/test-catalog.mjs",
+    "test": "npm run test:catalog",
+    "db:validate:catalog": "prisma validate --config prisma/catalog.config.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.1.0",
