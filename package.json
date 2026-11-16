@@ -1,0 +1,67 @@
+{
+  "name": "curso-ads-nest-microservices",
+  "version": "3.0.0",
+  "private": true,
+  "description": "Tutorial 3 NestJS: RabbitMQ, Notifications, DLQ, idempotencia e Transactional Outbox, Prisma 7, PostgreSQL e React/Vite",
+  "workspaces": [
+    "curso-ads"
+  ],
+  "scripts": {
+    "start:dev": "node scripts/start-dev.cjs",
+    "start:dev:gateway": "node --watch -r ts-node/register -r tsconfig-paths/register apps/api-gateway/src/main.ts",
+    "start:dev:users": "node --watch -r ts-node/register -r tsconfig-paths/register apps/users/src/main.ts",
+    "start:dev:orders": "node --watch -r ts-node/register -r tsconfig-paths/register apps/orders/src/main.ts",
+    "start:dev:web": "npm run dev --workspace curso-ads",
+    "build": "npm run db:generate && tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+    "build:web": "npm run build --workspace curso-ads",
+    "start:gateway": "node dist/apps/api-gateway/src/main.js",
+    "start:users": "node dist/apps/users/src/main.js",
+    "start:orders": "node dist/apps/orders/src/main.js",
+    "db:generate": "npm run db:generate:users && npm run db:generate:orders && npm run db:generate:notifications",
+    "db:generate:users": "prisma generate --config prisma/users.config.ts",
+    "db:generate:orders": "prisma generate --config prisma/orders.config.ts",
+    "db:migrate": "npm run db:migrate:users && npm run db:migrate:orders && npm run db:migrate:notifications",
+    "db:migrate:users": "prisma migrate dev --config prisma/users.config.ts",
+    "db:migrate:orders": "prisma migrate dev --config prisma/orders.config.ts",
+    "db:deploy": "prisma migrate deploy --config prisma/users.config.ts && prisma migrate deploy --config prisma/orders.config.ts && prisma migrate deploy --config prisma/notifications.config.ts",
+    "test:smoke": "node scripts/smoke-test.mjs",
+    "start:dev:notifications": "node --watch -r ts-node/register -r tsconfig-paths/register apps/notifications/src/main.ts",
+    "start:notifications": "node dist/apps/notifications/src/main.js",
+    "db:generate:notifications": "prisma generate --config prisma/notifications.config.ts",
+    "db:migrate:notifications": "prisma migrate dev --config prisma/notifications.config.ts",
+    "rabbitmq:setup": "node --env-file=.env scripts/setup-rabbitmq.cjs",
+    "test:smoke:events": "node scripts/test-events.mjs",
+    "db:ensure:notifications": "node scripts/ensure-notifications-db.cjs"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.0",
+    "@nestjs/core": "^11.1.0",
+    "@nestjs/microservices": "^11.1.0",
+    "@nestjs/platform-express": "^11.1.0",
+    "@prisma/adapter-pg": "^7.0.0",
+    "@prisma/client": "^7.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.14.2",
+    "dotenv": "^16.6.0",
+    "pg": "^8.15.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "@nestjs/schedule": "^6.0.0",
+    "amqplib": "^0.10.5",
+    "amqp-connection-manager": "^4.1.14"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@types/node": "^22.15.0",
+    "@types/pg": "^8.11.0",
+    "prisma": "^7.0.0",
+    "tsc-alias": "^1.8.16",
+    "typescript": "^5.8.0",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0"
+  },
+  "engines": {
+    "node": ">=20.19.0"
+  }
+}

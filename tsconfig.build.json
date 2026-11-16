@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": "dist",
+    "declaration": false
+  },
+  "include": [
+    "apps/**/*.ts",
+    "libs/**/*.ts",
+    "generated/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "curso-ads",
+    "**/*.spec.ts"
+  ]
+}

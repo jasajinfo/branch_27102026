@@ -1,0 +1,25 @@
+generator client {
+  provider            = "prisma-client"
+  output              = "../../generated/notifications"
+  moduleFormat        = "cjs"
+  importFileExtension = ""
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model ProcessedEvent {
+  eventId     String   @id
+  processedAt DateTime @default(now())
+}
+
+// A representação persistida é o efeito simulado; nenhuma mensagem é enviada por e-mail.
+model NotificationRecord {
+  id          Int      @id @default(autoincrement())
+  eventId     String   @unique
+  orderId     Int
+  userId      Int
+  total       String
+  createdAt   DateTime @default(now())
+}

@@ -1,175 +1,195 @@
-Curso ADS — Monorepositório NestJS + React
-Projeto de exemplo organizado em monorepositório, com dois aplicativos NestJS no backend e uma interface de cursos desenvolvida com React e Vite. O objetivo é demonstrar a comunicação entre API Gateway e microsserviço de usuários, mantendo o frontend e seus arquivos CSS organizados.
-Tecnologias utilizadas
-- Backend: Node.js, NestJS 11, TypeScript e comunicação TCP (@nestjs/microservices).
-- Frontend: React 19, Vite 8, JavaScript/JSX e CSS separado por componente.
-- Gerenciamento: npm com workspace em apps/web.
-- Persistência: usuários armazenados apenas em memória nesta versão (sem banco de dados).
-Estrutura do projeto
-nest-microservices/
+# Tutorial 03 — NestJS, RabbitMQ, Notifications e Transactional Outbox
+
+**Projeto completo, atualizado sobre o Tutorial 02.** O monorepo anterior foi preservado: API Gateway, Users, Orders, DTOs, bancos PostgreSQL existentes e frontend React/Vite (`curso-ads/`). A novidade é o serviço de notificações, a comunicação por eventos e os mecanismos de tratamento de falhas apresentados no **Tutorial 03**.
+
+## Funcionalidades implementadas
+
+- RabbitMQ 4 no Docker Compose, com interface de administração em `http://localhost:15672` (app / app123, **somente desenvolvimento local**).
+- Microserviço `notifications` consumindo `order.created` com `@EventPattern`, `noAck: false`, `prefetchCount: 1`, `ack` e `nack`.
+- `OrdersService` continua consultando o `UsersService` por **TCP**, mas cria cada pedido junto de um registro **OutboxEvent** na mesma transação Prisma.
+- `OutboxPublisher` percorre o Outbox a cada **5 segundos** e publica os eventos usando `ClientProxy.emit()`.
+- Dead-letter exchange `notifications.dlx` e fila `notifications_dlq` para mensagens rejeitadas (por exemplo, pedido com total `9999`).
+- Contrato compartilhado `OrderCreatedEvent` com `eventId` único, `occurredAt`, `orderId`, `userId` e `total`.
+- Idempotência persistida no banco `notifications_db`: as tabelas `ProcessedEvent` e `NotificationRecord` são gravadas na **mesma transação**, evitando duplicação do registro de notificação mesmo se o evento for entregue outra vez. **E-mails não são realmente enviados:** o efeito é uma gravação no banco e logs.
+- Migrações SQL para Outbox e Notifications, com comandos Prisma 7 separados para os três bancos.
+- Teste integrado `scripts/test-events.mjs` de publicação, idempotência e dead-letter queue.
+
+### Estrutura principal
+
+```text
+branch_27102026.3-main/
 ├── apps/
-│   ├── api-gateway/                # Aplicação NestJS que recebe requisições HTTP
-│   │   ├── src/
-│   │   │   ├── users/
-│   │   │   │   ├── dto/
-│   │   │   │   │   └── create-user.dto.ts
-│   │   │   │   └── users.controller.ts
-│   │   │   ├── app.controller.ts
-│   │   │   ├── app.module.ts
-│   │   │   └── main.ts
-│   │   └── tsconfig.app.json
-│   ├── users/                      # Microsserviço NestJS de usuários (TCP)
-│   │   ├── src/
-│   │   │   ├── main.ts
-│   │   │   ├── users.controller.ts
-│   │   │   ├── users.module.ts
-│   │   │   └── users.service.ts
-│   │   └── tsconfig.app.json
-│   └── web/                        # Interface React + Vite
-│       ├── public/
-│       ├── src/
-│       │   ├── components/         # Componentes .jsx e CSS correspondentes
-│       │   ├── data/
-│       │   │   └── courses.js      # Catálogo de cursos local
-│       │   ├── styles/
-│       │   │   ├── layout.css
-│       │   │   └── tokens.css
-│       │   ├── App.jsx
-│       │   ├── App.css
-│       │   ├── index.css
-│       │   └── main.jsx
-│       ├── package.json
-│       └── vite.config.js
+│   ├── api-gateway/src/          # HTTP :3000 (mantido)
+│   ├── users/src/                # TCP :3001 (mantido)
+│   ├── orders/src/               # TCP :3002 + Outbox Publisher
+│   └── notifications/src/        # RabbitMQ consumer, ACK/NACK, persistência
+├── libs/contracts/src/          # DTOs existentes + events.ts
+├── prisma/
+│   ├── users/                    # users_db
+│   ├── orders/                   # orders_db + OutboxEvent
+│   └── notifications/            # notifications_db + idempotência
+├── scripts/
+│   ├── setup-rabbitmq.cjs        # Declara filas e DLQ
+│   ├── ensure-notifications-db.cjs
+│   ├── smoke-test.mjs            # Testes existentes
+│   └── test-events.mjs           # Testes de eventos (novo)
+├── curso-ads/                   # Frontend React/Vite original
+├── docker-compose.yml           # PostgreSQL 16 + RabbitMQ 4
 ├── .env.example
-├── .gitignore
-├── nest-cli.json
-├── package.json
-├── tsconfig.json
-└── README.md
-Responsabilidade de cada aplicação
-Aplicação	Função	Porta padrão
-api-gateway	Recebe requisições HTTP e encaminha operações de usuários ao microsserviço	3000
-users	Processa os comandos de listar, consultar e cadastrar usuários por TCP	3001
-web	Exibe catálogo de cursos com busca, filtros e vídeos	5173
+└── package.json
+```
 
+## Preparação no VS Code / PowerShell (Windows)
 
-Importante: nesta implementação, o frontend utiliza dados locais de apps/web/src/data/courses.js e não está integrado à API /users. O backend funciona como um exemplo independente da arquitetura de microsserviços.
+**Pré-requisitos:** Node.js 20.19+ (recomendável Node 22 ou 24), npm e Docker Desktop iniciado. Abra **a pasta principal** (a que contém `package.json`, `apps/`, `prisma/` e `docker-compose.yml`), não `curso-ads/`.
 
-Pré-requisitos
-- Node.js: versão 20.19+ ou 22.12+ (recomendado utilizar versão LTS compatível).
-- npm: instalado junto do Node.js.
-- Visual Studio Code (opcional, recomendado para desenvolvimento).
-No terminal do VS Code, verifique:
-node -v
-npm -v
-Instalação
-1. Extraia o arquivo ZIP do projeto.
-2. No VS Code, use Arquivo > Abrir Pasta e selecione nest-microservices.
-3. No terminal, confirme que está na pasta que contém o package.json da raiz.
-4. Instale as dependências:
+```powershell
+# Execute uma vez, na raiz do projeto:
+Copy-Item .env.example .env
 npm install
-Execute a instalação na raiz nest-microservices, não dentro de apps/api-gateway ou apps/users. O npm utiliza o package.json da raiz e o workspace do frontend.
 
-Configuração opcional de ambiente
-O projeto contém .env.example com as configurações de referência:
-GATEWAY_PORT=3000
-USERS_HOST=127.0.0.1
-USERS_PORT=3001
-CORS_ORIGIN=http://localhost:5173
-Os valores acima já estão previstos como padrões no código. A simples criação de um arquivo .env não o carrega automaticamente nesta versão, pois não há um carregador de .env configurado no NestJS. Para alterar portas durante uma sessão do PowerShell, defina as variáveis de ambiente no terminal de cada processo antes de executá-lo (e mantenha USERS_HOST e USERS_PORT iguais no Gateway e no Users).
-Como executar
-Abra três terminais no VS Code, todos posicionados na raiz nest-microservices.
-Terminal 1 — Microsserviço de usuários
-npm run start:dev:users
-O serviço inicia no endereço TCP 127.0.0.1:3001. Essa porta não é um site HTTP; ela é usada para comunicação interna com o Gateway.
-Terminal 2 — API Gateway
-npm run start:dev:gateway
-API HTTP disponível, por padrão, em http://localhost:3000.
-Terminal 3 — Frontend React
-npm run start:dev:web
-No navegador, acesse o endereço informado pelo Vite (normalmente http://localhost:5173/).
-Visão geral da comunicação
-Navegador
-   │
-   ├── http://localhost:5173 ──> React/Vite (catálogo local de cursos)
-   │
-   └── http://localhost:3000 ──> API Gateway (NestJS)
-                                       │
-                                       └── TCP 127.0.0.1:3001
-                                               │
-                                               └── Users Service (NestJS)
-                                                      └── Lista em memória
-Rotas da API
-Método	Rota	Descrição
-GET	/health	Verifica se o API Gateway responde
-GET	/users	Lista todos os usuários cadastrados
-GET	/users/:id	Consulta um usuário pelo identificador numérico
-POST	/users	Cadastra um usuário com name e email
+docker compose up -d
 
+# O Docker cria as três bases automaticamente quando o volume é novo.
+# Este comando também cria notifications_db se o volume PostgreSQL já existia:
+npm run db:ensure:notifications
 
-Testes pelo PowerShell
-Com o Users e o Gateway em execução, abra outro terminal:
+# As migrações EXISTENTES já estão incluídas (não recrie as migrações iniciais).
+npm run db:deploy
+npm run db:generate
 
-1. Verificar funcionamento do Gateway
-Invoke-RestMethod -Uri "http://localhost:3000/health"
-Resposta esperada:
-{
-  "status": "ok",
-  "service": "api-gateway"
-}
-2. Consultar usuários cadastrados
-Invoke-RestMethod -Uri "http://localhost:3000/users"
-3. Cadastrar um usuário
-$usuario = @{
-    name = "Bruno"
-    email = "bruno@teste.com"
-} | ConvertTo-Json
+# Crie exchange e filas ANTES de iniciar as aplicações:
+npm run rabbitmq:setup
+```
 
-Invoke-RestMethod -Uri "http://localhost:3000/users" `
-    -Method Post `
-    -ContentType "application/json" `
-    -Body $usuario
-4. Consultar o usuário de ID 1
-Invoke-RestMethod -Uri "http://localhost:3000/users/1"
-O cadastro é temporário: os usuários desaparecem quando o microsserviço users é reiniciado.
+Se o seu PostgreSQL já está em outra porta, ajuste as três URLs `*_DATABASE_URL` no `.env`. Este projeto usa a porta **15433** por padrão, para evitar conflitos com o PostgreSQL na **15432** de outros exercícios. O comando `db:ensure:notifications` exige um usuário PostgreSQL autorizado a criar bancos.
 
-CSS organizado por componente
-A apresentação visual do site está separada da lógica React. Exemplos:
-Componente React	Arquivo de estilos
-Header.jsx	Header.css
-Banner.jsx	Banner.css
-CourseCard.jsx	CourseCard.css
-Footer.jsx	Footer.css
-VideoPlayer.jsx	VideoPlayer.css
+> **Atenção:** a configuração do RabbitMQ é idêntica no script de setup, no producer e no consumer. Se você já criou a fila `notifications_queue` manualmente sem DLX, o broker pode retornar `PRECONDITION_FAILED`. No **laboratório**, e somente se não precisar das mensagens, exclua essa fila pelo painel e execute `npm run rabbitmq:setup` novamente. **Nunca exclua uma fila de produção apenas para corrigir argumentos.**
 
+### Iniciando os quatro microserviços
 
-Esses arquivos estão em apps/web/src/components/. As variáveis globais de cores e espaçamentos ficam em apps/web/src/styles/tokens.css, enquanto layout.css centraliza estilos de layout compartilhados.
-Outros comandos úteis
-Execute a partir da pasta raiz:
-# Compilar backend e frontend
+Abra **quatro terminais separados** no VS Code, todos na pasta que contém o `package.json`, e execute **um comando em cada terminal**:
+
+| Terminal | Comando | Função |
+| --- | --- | --- |
+| 1 | `npm run start:dev:users` | Usuários por TCP, porta 3001 |
+| 2 | `npm run start:dev:orders` | Pedidos por TCP, porta 3002; Outbox de 5 em 5 s |
+| 3 | `npm run start:dev:notifications` | Consumidor da fila RabbitMQ |
+| 4 | `npm run start:dev:gateway` | API HTTP, porta 3000 |
+
+Os atalhos no formato do tutorial também funcionam, como `npm run start:dev -- notifications`, `npm run start:dev -- orders`, etc.
+
+Opcionalmente, inicie o frontend preservado em um quinto terminal com `npm run start:dev:web`, e abra `http://localhost:5173` (continua independente da API, como na versão anterior).
+
+## Teste pelo PowerShell
+
+Com Docker e os quatro serviços iniciados:
+
+```powershell
+# 1. Criar usuário
+$usuario = Invoke-RestMethod -Method Post -Uri 'http://localhost:3000/users' `
+  -ContentType 'application/json' -Body '{"name":"Ana","email":"ana-tutorial03@example.com"}'
+$usuario
+
+# 2. Criar pedido com o ID recebido; o retorno HTTP não espera a notificação
+$pedido = Invoke-RestMethod -Method Post -Uri 'http://localhost:3000/orders' `
+  -ContentType 'application/json' `
+  -Body (@{ userId = $usuario.id; description = 'Notebook Dell'; total = 4500 } | ConvertTo-Json)
+$pedido
+```
+
+No terminal `notifications`, depois que o publicador executar (até aproximadamente 5 segundos após a criação do pedido), deverão aparecer logs semelhantes a:
+
+```text
+[NotificationsService] Notificação do pedido 1
+[NotificationsService] Usuário: 1
+[NotificationsService] Total: R$ 4500
+```
+
+No RabbitMQ abra `http://localhost:15672`, entre com usuário `app` e senha `app123`, clique em **Queues and Streams** e observe `notifications_queue` e `notifications_dlq`.
+
+Para **simular uma falha** e verificar a DLQ:
+
+```powershell
+Invoke-RestMethod -Method Post -Uri 'http://localhost:3000/orders' `
+  -ContentType 'application/json' `
+  -Body (@{ userId = $usuario.id; description = 'Teste DLQ'; total = 9999 } | ConvertTo-Json)
+```
+
+O Notifications Service lançará a falha simulada, responderá com `nack(message, false, false)`, e a mensagem será encaminhada para `notifications_dlq`. A contagem do painel pode variar se outras mensagens estiverem sendo consumidas.
+
+**Teste integrado automatizado**, após criar as filas e iniciar os quatro serviços:
+
+```powershell
+npm run test:smoke            # Exercícios HTTP da Parte 2 (independente)
+npm run test:smoke:events     # Parte 3: Outbox -> RabbitMQ -> notificação, idempotência e DLQ
+```
+
+O teste de eventos cria dados de laboratório e **não os exclui**. Para evitar erro de e-mail repetido, o teste gera um endereço único a cada execução.
+
+## Funcionamento simplificado
+
+```text
+POST /orders (HTTP, Gateway)
+          |
+          v
+Orders Service --TCP/send()--> Users Service (confere o usuário)
+          |
+          v
+PostgreSQL orders_db (uma única transação)
+       Order + OutboxEvent(eventId, order.created)
+          |
+          v
+OutboxPublisher (a cada 5 segundos)
+          |
+          v
+RabbitMQ --> notifications_queue
+                      |
+                      v
+              Notifications Service
+                      |  sucesso: registra efeito uma vez, ACK
+                      |  falha:   NACK sem requeue
+                      v
+                notifications_dlq (quando falha)
+```
+
+### Observações técnicas e limites do tutorial
+
+- `emit()` **não é uma garantia de publisher confirm** durável. O publicador é a implementação **didática solicitada pelo tutorial**: ao receber retorno do Observable ele marca `publishedAt`, mas ainda existe uma pequena janela de risco de perda. Para produção, usar canal AMQP com **publisher confirms**, confirmação de roteamento e só depois marcar o evento como publicado.
+- Em múltiplas instâncias do Orders Service, um **claim/lease** ou bloqueio por transação deve impedir que vários publicadores selecionem o mesmo Outbox ao mesmo tempo. O código atual é adequado a uma única instância para estudo.
+- A DLQ foi implementada; **retries com TTL não foram adicionados**, pois o próprio Tutorial 03 os apresenta como exercício futuro e explica os riscos de um ciclo de reenvio infinito.
+- A idempotência protege o efeito **persistido** (NotificationRecord). Se no futuro enviar e-mail/SMS a um serviço externo, será necessária também chave idempotente no provedor ou uma estratégia de entregas para evitar duplicidades no efeito externo.
+- RabbitMQ e credenciais de desenvolvimento aqui demonstradas não devem ser expostos à Internet.
+
+## Resolução de problemas
+
+| Mensagem / situação | Ação |
+| --- | --- |
+| `Cannot find module` / `@nestjs/schedule` / `amqplib` | Execute `npm install` na raiz. Este ZIP não inclui `node_modules`. |
+| `PrismaClient ... generated` / TypeScript não acha `generated/*` | Execute `npm run db:generate`. |
+| `database notifications_db does not exist` | Execute `npm run db:ensure:notifications` e depois `npm run db:deploy`. |
+| `relation "OutboxEvent" does not exist` | Execute `npm run db:deploy` para aplicar a migração incremental. |
+| `PRECONDITION_FAILED - inequivalent arg` na fila RabbitMQ | Fila antiga sem DLX: veja aviso sobre exclusão apenas em laboratório, acima. |
+| `ECONNREFUSED 5672` | Ligue Docker Desktop, `docker compose up -d`, revise `RABBITMQ_URL`. |
+| `EADDRINUSE:3001/3002/3000` | Termine processos anteriores ou ajuste `USERS_PORT` / `ORDERS_PORT` / `GATEWAY_PORT`. |
+| Pedido criado mas sem log de notificação | Confira se notifications está iniciado, fila declarada e OutboxPublisher rodando; verifique o painel RabbitMQ e a DLQ. |
+
+## Compilação
+
+```powershell
 npm run build
+```
 
-# Compilar somente o Gateway
-npm run build:gateway
+Para atualizar seu repositório no GitHub, abra primeiro o **repositório local correto**, confirme `git remote -v` e `git branch --show-current`, faça `git add .`, `git commit -m "Implementa Tutorial 03 RabbitMQ e Outbox"` e `git push -u origin NOME_DA_BRANCH`. Não execute `git init` dentro de uma pasta já clonada. A pasta extraída do ZIP não contém histórico `.git`.
 
-# Compilar somente o Users
-npm run build:users
+### Sobre o arquivo de dependências
 
-# Compilar somente o frontend
-npm run build:web
-
-# Verificar o frontend com oxlint
-npm run lint:web
-Solução de problemas
-Erro ENOENT: Could not read package.json: o terminal não está na pasta correta. Execute Get-ChildItem -Name e procure o package.json na raiz nest-microservices.
-
-Erro ECONNREFUSED ou indisponibilidade em /users: verifique se npm run start:dev:users está em execução e se ambos os serviços utilizam as mesmas configurações TCP.
-
-Erro EADDRINUSE: a porta já está ocupada por outro processo. Encerre o processo antigo ou altere as variáveis de porta, mantendo os serviços sincronizados.
-
-O frontend abre, mas a API não responde: os três aplicativos são iniciados de forma independente. Certifique-se de que os terminais do Gateway e do Users estão ativos.
-
-O servidor Vite usa outra porta: utilize o endereço Local mostrado no próprio terminal, em vez de presumir que será sempre 5173.
-Limitações e próximas melhorias
-Esta é uma base didática de microsserviços. Ainda não há persistência em PostgreSQL, autenticação, testes automatizados nem integração do catálogo React com a API. Futuras evoluções podem incluir Prisma, banco de dados, gestão de cursos pela API e testes de integração.
-Projeto acadêmico — Curso ADS. Documentação referente à estrutura e aos comandos disponibilizados neste repositório.
+O `package-lock.json` veio da versão anterior do projeto. Como o Tutorial 03
+adicionou três bibliotecas (`@nestjs/schedule`, `amqplib`,
+`amqp-connection-manager`), **execute `npm install` na raiz** antes de iniciar
+o projeto; o npm atualizará automaticamente o lockfile. **Não comece por
+`npm ci`** enquanto o lockfile não tiver sido atualizado e salvo. O ambiente
+de preparação deste ZIP não pôde acessar o registro npm, portanto não foi
+possível atualizar o lockfile nem realizar um teste integrado com as novas
+dependências aqui. As sintaxes dos arquivos `.ts`, `.cjs` e `.mjs` foram
+verificadas localmente.
